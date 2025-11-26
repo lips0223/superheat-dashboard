@@ -60,9 +60,9 @@ export default function VerifyCode({ email, onSuccess, onBack }: VerifyCodeProps
         // 显示成功Toast
         setShowToast(true);
         
-        // 调用成功回调，不再跳转URL
+        // 调用成功回调，使用顶层的 token 属性
         setTimeout(() => {
-          onSuccess?.(result.data?.token || 'success');
+          onSuccess?.(result.token || 'success');
         }, 1000);
       } else {
         setError(result.message || "验证失败，请重试");

@@ -57,6 +57,7 @@ export interface VerifyCodeResponseData {
   email: string;
   token: string;
   redirectUrl?: string;
+  data?: any; // Supabase 返回的原始数据
 }
 
 /** 验证码状态查询响应数据 */
