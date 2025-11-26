@@ -55,14 +55,14 @@ export default function VerifyCode({ email, onSuccess, onBack }: VerifyCodeProps
       
       console.log("验证码验证结果:", result);
       
-      // Supabase verifyOtp 返回的结果
+      // request服务返回ApiResponse格式，数据在data字段中
       if (result.success) {
         // 显示成功Toast
         setShowToast(true);
         
-        // 调用成功回调，使用 result.token 而不是 result.data?.token
+        // 调用成功回调，不再跳转URL
         setTimeout(() => {
-          onSuccess?.(result.token || 'success');
+          onSuccess?.(result.data?.token || 'success');
         }, 1000);
       } else {
         setError(result.message || "验证失败，请重试");

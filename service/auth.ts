@@ -99,6 +99,7 @@ export interface ChangePasswordParams {
 
 /** 检查用户状态请求参数 */
 export interface CheckUserStatusParams {
+  userId?: string;  // Supabase user.id
   email: string;
 }
 
@@ -379,14 +380,15 @@ export const refreshToken = async () => {
 
 /**
  * 检查用户邮箱授权状态和是否首次登录
+ * 标准 Supabase 流程：必须使用 userId 查询
  */
-export const checkUserStatus = async (params: CheckUserStatusParams) => {
+export const checkUserStatus = async (userId: string) => {
   try {
-    // 查询 user_profiles 表
+    // 使用 user_id 查询 user_profiles 表
     const { data: profile, error } = await supabase
       .from('user_profiles')
       .select('*')
-      .eq('email', params.email)
+      .eq('user_id', userId)
       .single();
 
     // 如果查询出错且不是"未找到"错误，抛出异常
@@ -404,7 +406,7 @@ export const checkUserStatus = async (params: CheckUserStatusParams) => {
       success: true,
       authorized: isAuthorized,
       isFirstLogin,
-      email: params.email,
+      email: profile?.email || '',
       userInfo: profile || null,
       message: isAuthorized ? '' : '该邮箱未被授权使用此系统'
     };
@@ -416,6 +418,7 @@ export const checkUserStatus = async (params: CheckUserStatusParams) => {
 
 /**
  * 保存用户信息（首次登录）
+ * 标准 Supabase 流程：使用当前登录用户的 user_id
  */
 export const saveUserInfo = async (params: SaveUserInfoParams) => {
   try {
@@ -430,8 +433,8 @@ export const saveUserInfo = async (params: SaveUserInfoParams) => {
     const { data, error } = await supabase
       .from('user_profiles')
       .upsert({
-        user_id: user.id,
-        email: params.email,
+        user_id: user.id,  // 使用 Supabase Auth 的 user.id
+        email: user.email!, // 使用 Auth 用户的 email
         name: params.name,
         phone: params.phone,
         company: params.company,
@@ -449,7 +452,7 @@ export const saveUserInfo = async (params: SaveUserInfoParams) => {
       message: '用户信息保存成功',
       userInfo: {
         id: user.id,
-        email: params.email,
+        email: user.email!,
         name: params.name,
         phone: params.phone,
         company: params.company,

@@ -18,12 +18,10 @@ import { mockDevices, Device } from "@/lib/mock";
 import { useTranslation } from "react-i18next";
 // 状态徽章组件
 const StatusBadge = ({ status }: { status: Device["status"] }) => {
-  const variants: Record<Device["status"], string> = {
+  const variants = {
     Online: "bg-green-100 text-green-800 hover:bg-green-100",
     Offline: "bg-gray-100 text-gray-800 hover:bg-gray-100",
     Critical: "bg-red-100 text-red-800 hover:bg-red-100",
-    Attention: "bg-yellow-100 text-yellow-800 hover:bg-yellow-100",
-    Inactive: "bg-gray-100 text-gray-600 hover:bg-gray-100",
   };
 
   return (

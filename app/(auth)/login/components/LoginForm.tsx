@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { Input } from "@/components/ui/input";
-import { loginWithEmail, checkUserStatus } from "@/service/auth";
-import { useSearchParams } from "next/navigation";
+import { loginWithEmail, checkUserStatus, verifyCode } from "@/service/auth";
+import { useSearchParams, useRouter } from "next/navigation";
 import LoginByPhoneNumber from "./LoginByPhoneNumber";
 import VerifyCode from "./VerifyCode";
 import UserInfoForm from "./UserInfoForm";
@@ -15,6 +15,7 @@ import * as ToastPrimitives from "@radix-ui/react-toast";
 // import { useToast } from "@/components/hooks/use-toast"
 export default function LoginForm() {
   const searchSettings = useSearchParams();
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [isComposing, setIsComposing] = useState(false);
   const [emailValid, setEmailValid] = useState(false);
@@ -46,39 +47,46 @@ export default function LoginForm() {
   // 验证码成功后的处理
   const handleVerificationSuccess = async (token: string) => {
     try {
+      console.log("验证码验证中...");
+      
+      // 标准 Supabase 流程：验证 OTP
+      const verifyResult = await verifyCode({ email, code: token });
+      console.log("Verify code response:", verifyResult);
+      
+      // 从 verifyResult.data 中获取 user（Supabase Auth 返回的用户对象）
+      const user = verifyResult.data?.user;
+      if (!user || !user.id) {
+        throw new Error('验证失败，未获取到用户信息');
+      }
+
+      // 使用 user.id 查询用户资料表（只调用一次）
+      const statusResult = await checkUserStatus(user.id);
+      console.log("Check user status by userId:", statusResult);
+      
+      if (!statusResult.success || !statusResult.authorized) {
+        showToastMessage(statusResult.message || '该用户未被授权', "error");
+        setEmailVerified(false);
+        setUserEmail(null);
+        setIsComposing(false);
+        return;
+      }
+
       // 设置邮箱验证成功
       setEmailVerified(true);
       setUserEmail(email);
-      
-      // 调用后端检查用户状态
-      const response = await checkUserStatus({ email }) as any;
-      const result = response;
-      
-      if (!response.success || !result.success) {
-        const errorMessage = result.message || '检查用户状态失败';
-        showToastMessage(errorMessage, "error");
-        setEmailVerified(false);
-        setUserEmail(null);
-        setIsComposing(false);
-        return;
+      setFirstLogin(statusResult.isFirstLogin || false);
+
+      // 如果不是首次登录，直接跳转
+      if (!statusResult.isFirstLogin) {
+        showToastMessage('登录成功', "success");
+        setTimeout(() => {
+          router.push('/');
+        }, 500);
       }
       
-      if (!result.authorized) {
-        showToastMessage('该邮箱未授权', "error");
-        setEmailVerified(false);
-        setUserEmail(null);
-        setIsComposing(false);
-        return;
-      }
-      
-      setFirstLogin(result.isFirstLogin || false);
-   
-      // 验证成功后，组件会根据 emailVerified 和 isFirstLogin 状态自动显示相应的界面
-      // 如果非首次登录，后续可以直接跳转到dashboard
-      
-    } catch (error) {
+    } catch (error: any) {
       console.error('验证失败:', error);
-      showToastMessage('网络错误，请稍后重试', "error");
+      showToastMessage(error.message || '验证码错误，请重试', "error");
       setEmailVerified(false);
       setUserEmail(null);
       setIsComposing(false);
@@ -118,33 +126,20 @@ export default function LoginForm() {
 
   const handleSetEmailSubmit = async () => {
     try {
-      // 先检查邮箱是否在白名单中
-      const response = await checkUserStatus({ email }) as any;
-      const result = response;
-      console.log("Check user status response:", result);
-      if (!result.authorized) {
-        showToastMessage(result.message || '该邮箱未被授权使用此系统', "error");
-        return;
-      }
+      // 标准 Supabase 流程：直接发送验证码
+      // Supabase 会自动处理用户是否存在的问题
+      console.log("发送验证码到:", email);
       
-      // 邮箱授权通过，开始发送验证码流程
-      showToastMessage('邮箱验证通过，正在发送验证码...', "success");
-      setIsComposing(true);
-      setNonce(60); // 重置倒计时
-      
-      // 发送验证码
       const emailResult = await loginWithEmail({ email });
       console.log("Send verification code response:", emailResult);
       
-    } catch (error: any) {
-      console.error('邮箱验证失败:', error);
+      showToastMessage('验证码已发送到您的邮箱', "success");
+      setIsComposing(true);
+      setNonce(60); // 重置倒计时
       
-      // 优先使用错误消息，如果是业务错误（如未授权）
-      if (error.message && (error.message.includes('授权') || error.message.includes('EMAIL_NOT_AUTHORIZED'))) {
-        showToastMessage(error.message, "error");
-      } else {
-        showToastMessage('网络错误，请稍后重试', "error");
-      }
+    } catch (error: any) {
+      console.error('发送验证码失败:', error);
+      showToastMessage(error.message || '发送验证码失败，请稍后重试', "error");
     }
   };
 
